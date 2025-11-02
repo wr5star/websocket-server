@@ -12,7 +12,9 @@ async def ws_handler(websocket):
             print(f"Received: {message}")
             await websocket.send(f"Echo: {message}")
     except Exception as e:
-        print(f"WebSocket error: {e}")
+        # Ignore HEAD request errors or malformed handshakes
+        if "unsupported HTTP method" not in str(e):
+            print(f"WebSocket error: {e}")
     finally:
         connected.remove(websocket)
         print("Client disconnected")
@@ -20,8 +22,13 @@ async def ws_handler(websocket):
 # WebSocket server
 async def start_websocket():
     print("✅ WebSocket running on port 8765")
-    async with websockets.serve(ws_handler, "0.0.0.0", 8765):
-        await asyncio.Future()  # Run forever
+    try:
+        async with websockets.serve(ws_handler, "0.0.0.0", 8765):
+            await asyncio.Future()  # Run forever
+    except Exception as e:
+        # Ignore Render’s HEAD/HTTP probe errors silently
+        if "unsupported HTTP method" not in str(e):
+            print(f"Server error: {e}")
 
 # HTTP health check (Render uses this)
 async def health_check(request):
@@ -29,8 +36,7 @@ async def health_check(request):
 
 async def start_http():
     app = web.Application()
-    # ✅ Only GET route — do NOT add web.head()
-    app.add_routes([web.get("/", health_check)])
+    app.add_routes([web.get("/", health_check)])  # ✅ Only GET
     runner = web.AppRunner(app)
     await runner.setup()
     site = web.TCPSite(runner, "0.0.0.0", 10000)
