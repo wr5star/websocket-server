@@ -23,18 +23,19 @@ async def start_websocket():
     async with websockets.serve(ws_handler, "0.0.0.0", 8765):
         await asyncio.Future()  # Run forever
 
-# Health-check HTTP server (for Render)
+# HTTP health check (Render uses this)
 async def health_check(request):
     return web.Response(text="OK", status=200)
 
 async def start_http():
     app = web.Application()
-    app.add_routes([web.get("/", health_check)])  # ONLY GET route — no web.head!
+    # ✅ Only GET route — do NOT add web.head()
+    app.add_routes([web.get("/", health_check)])
     runner = web.AppRunner(app)
     await runner.setup()
     site = web.TCPSite(runner, "0.0.0.0", 10000)
     await site.start()
-    print("🟢 HTTP health check on port 10000")
+    print("🟢 Health check running on port 10000")
 
 async def main():
     await asyncio.gather(start_websocket(), start_http())
