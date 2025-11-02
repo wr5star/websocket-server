@@ -17,19 +17,19 @@ async def ws_handler(websocket):
         connected.remove(websocket)
         print("Client disconnected")
 
-# WebSocket server (Render should NOT health-check this)
+# WebSocket server
 async def start_websocket():
     print("✅ WebSocket running on port 8765")
     async with websockets.serve(ws_handler, "0.0.0.0", 8765):
-        await asyncio.Future()  # keep alive
+        await asyncio.Future()  # Run forever
 
-# Health-check HTTP server (Render will ping this instead)
+# Health-check HTTP server (for Render)
 async def health_check(request):
     return web.Response(text="OK", status=200)
 
 async def start_http():
     app = web.Application()
-    app.add_routes([web.get("/", health_check)])  # GET automatically covers HEAD
+    app.add_routes([web.get("/", health_check)])  # ONLY GET route — no web.head!
     runner = web.AppRunner(app)
     await runner.setup()
     site = web.TCPSite(runner, "0.0.0.0", 10000)
