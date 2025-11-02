@@ -1,43 +1,52 @@
 import asyncio
 import websockets
 from aiohttp import web
+import os
 
-connected = set()
+# ===============================
+#  WebSocket Server (Port 8765)
+# ===============================
+connected_clients = set()
 
-async def ws_handler(websocket):
-    connected.add(websocket)
-    print("🟢 Client connected:", websocket.remote_address)
+async def handler(websocket):
+    print("Client connected")
+    connected_clients.add(websocket)
     try:
         async for message in websocket:
-            print(f"📩 Received: {message}")
-            for conn in connected:
-                if conn != websocket:
-                    await conn.send(message)
-    except websockets.ConnectionClosed:
-        print("🔴 Client disconnected:", websocket.remote_address)
+            print(f"Received: {message}")
+            await websocket.send(f"Echo: {message}")
+    except Exception as e:
+        print(f"WebSocket error: {e}")
     finally:
-        connected.remove(websocket)
+        connected_clients.remove(websocket)
+        print("Client disconnected")
 
-async def websocket_server():
-    async with websockets.serve(ws_handler, "0.0.0.0", 8765):
-        print("✅ WebSocket server ready on port 8765")
-        await asyncio.Future()  # Keep running forever
+async def start_websocket():
+    port = 8765
+    print(f"✅ WebSocket server ready on port {port}")
+    async with websockets.serve(handler, "0.0.0.0", port):
+        await asyncio.Future()  # Run forever
 
-# --- HTTP Health Endpoint (for Render) ---
-async def health_check(request):
+# ===============================
+#  HTTP Health Check (Port 10000)
+# ===============================
+async def healthcheck(request):
     return web.Response(text="OK", status=200)
 
-async def main():
-    # aiohttp web server for health check
+async def start_http():
     app = web.Application()
-    app.add_routes([web.get("/", health_check), web.head("/", health_check)])
+    app.add_routes([web.get("/", healthcheck)])
     runner = web.AppRunner(app)
     await runner.setup()
     site = web.TCPSite(runner, "0.0.0.0", 10000)
     await site.start()
+    print("🟢 Health check running on port 10000")
 
-    # Run both WebSocket and HTTP together
-    await websocket_server()
+# ===============================
+#  Run Both
+# ===============================
+async def main():
+    await asyncio.gather(start_websocket(), start_http())
 
 if __name__ == "__main__":
     asyncio.run(main())
